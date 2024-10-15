@@ -14,38 +14,37 @@ import time
 
 
 # Layout for API keys input
-api_keys = st.columns(2)
-groq_api_key_col, openai_api_key_col = api_keys
+api_keys = st.columns(1)
+openai_api_key_col = api_keys
 
-groq_api_key = groq_api_key_col.text_input("GROQ API Key", type="password")
+# groq_api_key = groq_api_key_col.text_input("GROQ API Key", type="password")
 openai_api_key = openai_api_key_col.text_input("OPENAI API Key", type="password")
 
 # Check if both keys are entered
-if not groq_api_key or not openai_api_key:
-    st.error("Please enter both GROQ and Google API keys to continue.", icon="❗️")
+if not openai_api_key:
+    st.error("Please enter OpenAI API keys to continue.", icon="❗️")
 else:
-
-
     # Streamlit title and setup
-    st.title("Deblase Document Q&A")
+    st.title("Document Q&A with OpenAI Assistant")
     
-    # Initialize the language model (GROQ model for Q&A)
-    groq_api_key = os.getenv('GROQ_API_KEY')
-    llm = ChatGroq(groq_api_key=groq_api_key, model_name="llama3-groq-70b-8192-tool-use-preview")
+    # Initialize the OpenAI GPT model for Q&A
+    openai_llm = ChatOpenAI(openai_api_key=openai_api_key, model="gpt-3.5-turbo")
     
-    # Define the prompt template for Q&A
-    prompt = ChatPromptTemplate.from_template(
-        """
-        Answer the questions based on the provided context only.
-        Please provide the most accurate response based on the question
-        <context>
-        {context}
-        <context>
-        Questions:{input}
-        """
-    )
+    # Define the prompt template for OpenAI assistant to answer based on context
+    prompt_template = """
+    You are an assistant helping with document retrieval. Based on the following context, answer the question:
     
-    # Function for vector embedding using OpenAI embeddings
+    Context:
+    {context}
+    
+    Question: {question}
+    
+    Answer:
+    """
+    
+    prompt = PromptTemplate(input_variables=["context", "question"], template=prompt_template)
+    
+    # Function to handle document embedding
     def vector_embedding():
         if "vectors" not in st.session_state:
             # Initialize OpenAI embeddings with the loaded API key
@@ -55,17 +54,28 @@ else:
             st.session_state.loader = PyPDFDirectoryLoader("./debase_doc_c")  # Data Ingestion
             st.session_state.docs = st.session_state.loader.load()  # Document Loading
             
+            # Ensure documents are not empty
+            if len(st.session_state.docs) == 0:
+                st.error("No documents found. Please ensure the documents are properly loaded.")
+                return
+            
             # Split documents into chunks for better embedding
             st.session_state.text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
             st.session_state.final_documents = st.session_state.text_splitter.split_documents(st.session_state.docs[:20])  # Splitting
     
-            # Check if there are any documents to create the index
-            if len(st.session_state.final_documents) > 0:
-                # Use FAISS to create a vector store with OpenAI embeddings
+            # Ensure the documents were split properly
+            if len(st.session_state.final_documents) == 0:
+                st.error("No document chunks were created. Please check the document loading and splitting process.")
+                return
+    
+            # Generate embeddings for the document chunks
+            try:
                 st.session_state.vectors = FAISS.from_documents(st.session_state.final_documents, st.session_state.embeddings)
                 st.success("Document embedding and vector store created successfully!")
-            else:
-                st.warning("No documents loaded or split. Please check data loading and splitting.")
+            except IndexError as e:
+                st.error(f"Failed to create vector store: {str(e)}")
+            except Exception as e:
+                st.error(f"An unexpected error occurred during embedding: {str(e)}")
     
     # Input for asking questions from documents
     prompt1 = st.text_input("Enter Your Question From Documents")
@@ -77,27 +87,30 @@ else:
     
     # Handle question-answering if a question is asked
     if prompt1:
-        document_chain = create_stuff_documents_chain(llm, prompt)
-        
-        # Ensure that the vector store has been created
         if "vectors" in st.session_state:
+            # Retrieve similar documents based on the user's query
             retriever = st.session_state.vectors.as_retriever()
-            retrieval_chain = create_retrieval_chain(retriever, document_chain)
+            relevant_docs = retriever.get_relevant_documents(prompt1)
             
-            # Measure response time
-            start = time.process_time()
-            response = retrieval_chain.invoke({'input': prompt1})
-            st.write("Response time: ", time.process_time() - start)
-            
-            # Display the answer
-            st.write(response['answer'])
+            # Combine the retrieved documents into a single context string
+            context = "\n\n".join([doc.page_content for doc in relevant_docs])
     
-            # With a streamlit expander, show relevant document chunks
+            # Use OpenAI's LLM (GPT) to answer the question based on the context
+            chain = LLMChain(llm=openai_llm, prompt=prompt)
+            response = chain.run({"context": context, "question": prompt1})
+    
+            # Display the response
+            st.write(response)
+    
+            # Optionally, display the relevant document chunks in an expander
             with st.expander("Document Similarity Search"):
-                for i, doc in enumerate(response.get("context", [])):
+                for i, doc in enumerate(relevant_docs):
+                    st.write(f"Document {i + 1}:")
                     st.write(doc.page_content)
                     st.write("--------------------------------")
         else:
             st.error("Please embed the documents first by clicking 'Documents Embedding'.")
 
 
+    
+           
