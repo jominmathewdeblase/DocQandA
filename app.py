@@ -16,6 +16,8 @@ load_dotenv()
 ## load the GROQ And OpenAI API KEY 
 groq_api_key=os.getenv('GROQ_API_KEY')
 os.environ["GOOGLE_API_KEY"]=os.getenv("GOOGLE_API_KEY")
+# Check if the keys are loaded correctly
+st.write("Google API Key Loaded:", os.environ.get("GOOGLE_API_KEY") is not None)
 
 st.title("Deblase Document Q&A")
 
