@@ -1,5 +1,3 @@
-
-
 import streamlit as st
 import os
 from langchain_groq import ChatGroq
@@ -12,18 +10,20 @@ from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from dotenv import load_dotenv
 import os
+
 load_dotenv()
 
-## load the GROQ And OpenAI API KEY 
+## load the GROQ And OpenAI API KEY 
 groq_api_key=os.getenv('GROQ_API_KEY')
 os.environ["GOOGLE_API_KEY"]=os.getenv("GOOGLE_API_KEY")
+
 # Check if the keys are loaded correctly
 st.write("Google API Key Loaded:", os.environ.get("GOOGLE_API_KEY") is not None)
 
 st.title("Deblase Document Q&A")
 
 llm=ChatGroq(groq_api_key=groq_api_key,
-             model_name="llama3-groq-70b-8192-tool-use-preview")
+             model_name="llama3-groq-70b-8192-tool-use-preview")
 
 prompt=ChatPromptTemplate.from_template(
 """
@@ -39,14 +39,19 @@ Questions:{input}
 
 def vector_embedding():
 
-    if "vectors" not in st.session_state:
+    if "vectors" not in st.session_state:
 
-        st.session_state.embeddings=GoogleGenerativeAIEmbeddings(model = "models/embedding-001")
-        st.session_state.loader=PyPDFDirectoryLoader("./debase_doc_c") ## Data Ingestion
-        st.session_state.docs=st.session_state.loader.load() ## Document Loading
-        st.session_state.text_splitter=RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=200) ## Chunk Creation
-        st.session_state.final_documents=st.session_state.text_splitter.split_documents(st.session_state.docs[:20]) #splitting
-        st.session_state.vectors=FAISS.from_documents(st.session_state.final_documents,st.session_state.embeddings) #vector OpenAI embeddings
+        st.session_state.embeddings=GoogleGenerativeAIEmbeddings(model = "models/embedding-001")
+        st.session_state.loader=PyPDFDirectoryLoader("./debase_doc_c") ## Data Ingestion
+        st.session_state.docs=st.session_state.loader.load() ## Document Loading
+        st.session_state.text_splitter=RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=200) ## Chunk Creation
+        st.session_state.final_documents=st.session_state.text_splitter.split_documents(st.session_state.docs[:20]) #splitting
+
+        # Check if there are any documents to create the index
+        if len(st.session_state.final_documents) > 0:
+            st.session_state.vectors=FAISS.from_documents(st.session_state.final_documents,st.session_state.embeddings)
+        else:
+            st.warning("No documents loaded or split. Please check data loading and splitting.")
 
 
 
@@ -56,25 +61,25 @@ prompt1=st.text_input("Enter Your Question From Documents")
 
 
 if st.button("Documents Embedding"):
-    vector_embedding()
-    st.write("Vector Store DB Is Ready")
+    vector_embedding()
+    st.write("Vector Store DB Is Ready")
 
 import time
 
 
 
 if prompt1:
-    document_chain=create_stuff_documents_chain(llm,prompt)
-    retriever=st.session_state.vectors.as_retriever()
-    retrieval_chain=create_retrieval_chain(retriever,document_chain)
-    start=time.process_time()
-    response=retrieval_chain.invoke({'input':prompt1})
-    print("Response time :",time.process_time()-start)
-    st.write(response['answer'])
+    document_chain=create_stuff_documents_chain(llm,prompt)
+    retriever=st.session_state.vectors.as_retriever()
+    retrieval_chain=create_retrieval_chain(retriever,document_chain)
+    start=time.process_time()
+    response=retrieval_chain.invoke({'input':prompt1})
+    print("Response time :",time.process_time()-start)
+    st.write(response['answer'])
 
-    # With a streamlit expander
-    with st.expander("Document Similarity Search"):
-        # Find the relevant chunks
-        for i, doc in enumerate(response["context"]):
-            st.write(doc.page_content)
-            st.write("--------------------------------")
+    # With a streamlit expander
+    with st.expander("Document Similarity Search"):
+        # Find the relevant chunks
+        for i, doc in enumerate(response["context"]):
+            st.write(doc.page_content)
+            st.write("--------------------------------")
