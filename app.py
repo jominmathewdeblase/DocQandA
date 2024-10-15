@@ -60,7 +60,7 @@ else:
             st.session_state.embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
             
             # Load documents from the directory
-            st.session_state.loader = PyPDFDirectoryLoader("./deblase_doc_c")  # Data Ingestion
+            st.session_state.loader = PyPDFDirectoryLoader("./debase_doc_c")  # Data Ingestion
             st.session_state.docs = st.session_state.loader.load()  # Document Loading
 
             # Ensure documents are not empty
