@@ -1,3 +1,4 @@
+!pip install --upgrade langchain-google-genai langchain-core
 
 import streamlit as st
 import os
