@@ -15,13 +15,13 @@ import time
 
 # Layout for API keys input
 api_keys = st.columns(2)
-groq_api_key_col, google_api_key_col = api_keys
+groq_api_key_col, openai_api_key_col = api_keys
 
 groq_api_key = groq_api_key_col.text_input("GROQ API Key", type="password")
-openai_api_key = google_api_key_col.text_input("OPENAI API Key", type="password")
+openai_api_key = openai_api_key_col.text_input("OPENAI API Key", type="password")
 
 # Check if both keys are entered
-if not groq_api_key or not google_api_key:
+if not groq_api_key or not openai_api_key:
     st.error("Please enter both GROQ and Google API keys to continue.", icon="❗️")
 else:
 
